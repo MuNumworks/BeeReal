@@ -76,7 +76,7 @@ async def on_ready():
         synced = await bot.tree.sync()
         #guild=discord.Object(id=1241425736754008156))
         print(f'Synced {len(synced)} command(s)')
-        schedule_daily_message(time.localtime().tm_wday, 11, 32)
+        schedule_daily_message(time.localtime().tm_wday, 12, 30)
         scheduler.start()
         print('Scheduler started.')
 
