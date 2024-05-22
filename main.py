@@ -1,4 +1,4 @@
-## BeeReal Discord Bot - Eratz!
+## BeeReal Discord Bot - Eratz! && Mu
 from logging import exception
 import os
 import discord
