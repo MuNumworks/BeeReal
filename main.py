@@ -79,7 +79,15 @@ async def on_ready():
         #guild=discord.Object(id=1241425736754008156))
         print(f'Synced {len(synced)} command(s)')
         print(time.localtime().tm_wday)
-        schedule_daily_message(DAY_TEMPLATE[time.localtime().tm_wday], 11, 53)
+        now = time.localtime()
+        hour = now.tm_hour
+        print(hour)
+        minute = now.tm_min + 5
+        if minute >= 60:
+            hour += 1
+            minute -= 60
+        schedule_daily_message(DAY_TEMPLATE[time.localtime().tm_wday], hour,
+                               minute)
         scheduler.start()
         print('Scheduler started.')
 
