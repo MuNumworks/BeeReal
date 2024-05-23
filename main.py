@@ -23,6 +23,8 @@ default_intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=default_intents)
 
+DAY_TEMPLATE = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
 GUILD_TEMPLATE = {
     "channels": {
         "alert_channel": "",
@@ -37,7 +39,7 @@ GUILD_TEMPLATE = {
 }
 
 global THE_HOUR
-THE_HOUR = [-100]
+THE_HOUR = [-100, False]
 
 
 def ensure_guild_file():
@@ -59,14 +61,14 @@ def ensure_guild_file():
     return decorator
 
 
-scheduler = AsyncIOScheduler(timezone='Europe/Paris')
+scheduler = AsyncIOScheduler()
 
 
 def schedule_daily_message(day, hour, minute):
     # Ajoute une tâche à exécuter à l'heure spécifiée
     #print("DEBUG : schedule_daily_message infunc added")
     scheduler.add_job(send_daily_message,
-                      CronTrigger(day=day, hour=hour, minute=minute))
+                      CronTrigger(day_of_week=day, hour=hour, minute=minute))
 
 
 @bot.event
@@ -76,7 +78,8 @@ async def on_ready():
         synced = await bot.tree.sync()
         #guild=discord.Object(id=1241425736754008156))
         print(f'Synced {len(synced)} command(s)')
-        schedule_daily_message(time.localtime().tm_wday, 12, 30)
+        print(time.localtime().tm_wday)
+        schedule_daily_message(DAY_TEMPLATE[time.localtime().tm_wday], 11, 53)
         scheduler.start()
         print('Scheduler started.')
 
@@ -85,6 +88,7 @@ async def on_ready():
 
 
 async def send_daily_message():
+    print(">>> DEBUG : SEND DAILY MESSAGE")
     for filename in os.listdir("Guilds/"):
         PATH = f"Guilds/{filename}"
         with open(PATH, "r") as f:
@@ -94,17 +98,21 @@ async def send_daily_message():
             await channel.send(
                 "# C'est l'heure du BeeReal !\n### Vous avez 10 minutes pour utiliser */post* afin de poster votre BeeReal"
             )
+    bot_webhooks = {}
     THE_HOUR[0] = int(time.time())
+    THE_HOUR[1] = True
     # Planifiez la prochaine tâche à une heure aléatoire
     next_hour = random.randint(7, 18)
     next_minute = random.randint(0, 59)
-    print(f'Prochaine tâche planifiée à {next_hour:02d}:{next_minute:02d}')
+    print(
+        f'Prochaine tâche planifiée à {DAY_TEMPLATE[(time.localtime().tm_wday + 1) % 7]} {next_hour:02d}:{next_minute:02d}'
+    )
 
     # Replanifiez la tâche
     for job in scheduler.get_jobs():
         job.remove()
-    schedule_daily_message((time.localtime().tm_wday + 1) % 7, next_hour,
-                           next_minute)
+    schedule_daily_message(DAY_TEMPLATE[(time.localtime().tm_wday + 1) % 7],
+                           next_hour, next_minute)
     #return time.time()
 
 
@@ -361,7 +369,9 @@ async def post(interaction: discord.Interaction, image: discord.Attachment,
         await webhook.edit(avatar=avatar_data)
 
         # Enregistrez le webhook pour une utilisation ultérieure
-        bot_webhooks[interaction.user.id] = webhook
+        if not interaction.guild_id in bot_webhooks:
+            bot_webhooks[interaction.guild_id] = dict()
+        bot_webhooks[interaction.guild_id][interaction.user.id] = webhook
 
         await interaction.response.send_message(
             f'BeeReal of {interaction.user.name} posté avec succès.')
@@ -373,10 +383,13 @@ async def post(interaction: discord.Interaction, image: discord.Attachment,
 
 @bot.event
 async def on_message(message):
+    #print(bot_webhooks)
     with open(f"Guilds/{message.guild.id}.json", "r") as f:
         the_channel = json.loads(f.read())["channels"]["post_channel"]
-    if message.author.id in bot_webhooks and message.channel.id == the_channel:
-        webhook = bot_webhooks[message.author.id]
+    if message.guild.id in bot_webhooks.keys(
+    ) and message.author.id in bot_webhooks[
+            message.guild.id] and message.channel.id == the_channel:
+        webhook = bot_webhooks[message.guild.id][message.author.id]
         await message.delete()
         await webhook.send(content=message.content)
     else:
